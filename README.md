@@ -1,5 +1,7 @@
 # TaskFlow (Obsidian-backed)
 
+![TaskFlow screenshot](Screenshot%202026-03-20%20150603.png)
+
 A local task and planning app that uses your **Obsidian vault as the database**. Tasks are read from `PROJECTS/*/Execution plan.md` and `RESOURCES/Open and recurring tasks.md`. The UI is inspired by **Things** (clean, minimal, rounded).
 
 ## Features
