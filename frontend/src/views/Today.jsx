@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getToday, refresh, getQuickTodos, addQuickTodo, updateQuickTodo, deleteQuickTodo } from '../api';
+import { getToday, refresh } from '../api';
 import '../App.css';
 
 function TaskItem({ task }) {
@@ -28,26 +28,27 @@ function getTodayDateStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+let nextId = 1;
+
 export default function Today() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [quickTodos, setQuickTodos] = useState([]);
   const [newTodoText, setNewTodoText] = useState('');
-  const [addingTodo, setAddingTodo] = useState(false);
-  const [addError, setAddError] = useState(null);
 
   const dateStr = getTodayDateStr();
 
   const load = async () => {
     setLoading(true);
-    const [todayResult, todosResult] = await Promise.allSettled([
-      getToday(),
-      getQuickTodos(dateStr),
-    ]);
-    if (todayResult.status === 'fulfilled') setData(todayResult.value);
-    if (todosResult.status === 'fulfilled') setQuickTodos(todosResult.value.todos || []);
-    setLoading(false);
+    try {
+      const todayData = await getToday();
+      setData(todayData);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -64,38 +65,19 @@ export default function Today() {
     }
   };
 
-  const handleAddTodo = async () => {
+  const handleAddTodo = () => {
     const text = newTodoText.trim();
     if (!text) return;
-    setAddingTodo(true);
-    setAddError(null);
-    try {
-      const todo = await addQuickTodo(dateStr, text);
-      setQuickTodos(prev => [...prev, todo]);
-      setNewTodoText('');
-    } catch (e) {
-      setAddError(`Could not save: ${e.message}`);
-    } finally {
-      setAddingTodo(false);
-    }
+    setQuickTodos(prev => [...prev, { id: nextId++, text, done: false }]);
+    setNewTodoText('');
   };
 
-  const handleToggleTodo = async (todo) => {
-    try {
-      const updated = await updateQuickTodo(todo.id, { done: !todo.done });
-      setQuickTodos(prev => prev.map(t => t.id === todo.id ? updated : t));
-    } catch (e) {
-      console.error(e);
-    }
+  const handleToggleTodo = (id) => {
+    setQuickTodos(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
   };
 
-  const handleDeleteTodo = async (id) => {
-    try {
-      await deleteQuickTodo(id);
-      setQuickTodos(prev => prev.filter(t => t.id !== id));
-    } catch (e) {
-      console.error(e);
-    }
+  const handleDeleteTodo = (id) => {
+    setQuickTodos(prev => prev.filter(t => t.id !== id));
   };
 
   if (loading) {
@@ -166,17 +148,16 @@ export default function Today() {
                 value={newTodoText}
                 onChange={e => setNewTodoText(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleAddTodo()}
-                disabled={addingTodo}
+                autoFocus
               />
               <button
                 className="quick-todo-add-btn"
                 onClick={handleAddTodo}
-                disabled={addingTodo || !newTodoText.trim()}
+                disabled={!newTodoText.trim()}
               >
                 Add
               </button>
             </div>
-            {addError && <p className="quick-todo-error">{addError}</p>}
             {quickTodos.length > 0 && (
               <ul className="quick-todo-list">
                 {quickTodos.map(todo => (
@@ -185,7 +166,7 @@ export default function Today() {
                       type="checkbox"
                       className="task-checkbox"
                       checked={todo.done}
-                      onChange={() => handleToggleTodo(todo)}
+                      onChange={() => handleToggleTodo(todo.id)}
                     />
                     <span className="quick-todo-text">{todo.text}</span>
                     <button
@@ -199,7 +180,7 @@ export default function Today() {
                 ))}
               </ul>
             )}
-            {quickTodos.length === 0 && !addError && (
+            {quickTodos.length === 0 && (
               <p className="empty-state small">No quick to-dos yet. Add one above.</p>
             )}
           </div>
