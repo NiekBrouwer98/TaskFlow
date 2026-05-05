@@ -249,6 +249,17 @@
   font-size: 0.9375rem;
 }
 
+.overdue-label {
+  color: var(--high-priority);
+  font-weight: 500;
+}
+
+.quick-todo-error {
+  font-size: 0.8125rem;
+  color: #c00;
+  margin: 0 0 12px 0;
+}
+
 .refresh-bar {
   display: flex;
   justify-content: flex-end;

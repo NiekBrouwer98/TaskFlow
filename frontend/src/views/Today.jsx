@@ -3,6 +3,7 @@ import { getToday, refresh, getQuickTodos, addQuickTodo, updateQuickTodo, delete
 import '../App.css';
 
 function TaskItem({ task }) {
+  const isOverdue = task.due && task.due < task._today;
   return (
     <div className={`task-row ${task.done ? 'task-finished' : ''}`}>
       <span className={`priority-dot ${task.priority}`} />
@@ -10,7 +11,11 @@ function TaskItem({ task }) {
         <div className="task-text">{task.text}</div>
         <div className="task-meta">
           {task.project && <span>{task.project}</span>}
-          {task.due && <span>Due {task.due}</span>}
+          {task.due && (
+            <span className={isOverdue ? 'overdue-label' : ''}>
+              Due {task.due}
+            </span>
+          )}
           {task.start && task.start !== task.due && <span>Start {task.start}</span>}
         </div>
       </div>
@@ -30,23 +35,19 @@ export default function Today() {
   const [quickTodos, setQuickTodos] = useState([]);
   const [newTodoText, setNewTodoText] = useState('');
   const [addingTodo, setAddingTodo] = useState(false);
+  const [addError, setAddError] = useState(null);
 
   const dateStr = getTodayDateStr();
 
   const load = async () => {
     setLoading(true);
-    try {
-      const [todayData, todosData] = await Promise.all([
-        getToday(),
-        getQuickTodos(dateStr),
-      ]);
-      setData(todayData);
-      setQuickTodos(todosData.todos || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    const [todayResult, todosResult] = await Promise.allSettled([
+      getToday(),
+      getQuickTodos(dateStr),
+    ]);
+    if (todayResult.status === 'fulfilled') setData(todayResult.value);
+    if (todosResult.status === 'fulfilled') setQuickTodos(todosResult.value.todos || []);
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -67,12 +68,13 @@ export default function Today() {
     const text = newTodoText.trim();
     if (!text) return;
     setAddingTodo(true);
+    setAddError(null);
     try {
       const todo = await addQuickTodo(dateStr, text);
       setQuickTodos(prev => [...prev, todo]);
       setNewTodoText('');
     } catch (e) {
-      console.error(e);
+      setAddError('Could not save — is the backend running?');
     } finally {
       setAddingTodo(false);
     }
@@ -105,7 +107,7 @@ export default function Today() {
     );
   }
 
-  const tasks = data?.allRelevant ?? [];
+  const tasks = (data?.allRelevant ?? []).map(t => ({ ...t, _today: dateStr }));
   const scheduledSlots = data?.scheduledSlots ?? [];
   const googleEvents = data?.googleEvents ?? [];
   const sortedSlots = [...scheduledSlots].sort((a, b) =>
@@ -174,6 +176,7 @@ export default function Today() {
                 Add
               </button>
             </div>
+            {addError && <p className="quick-todo-error">{addError}</p>}
             {quickTodos.length > 0 && (
               <ul className="quick-todo-list">
                 {quickTodos.map(todo => (
@@ -196,7 +199,7 @@ export default function Today() {
                 ))}
               </ul>
             )}
-            {quickTodos.length === 0 && (
+            {quickTodos.length === 0 && !addError && (
               <p className="empty-state small">No quick to-dos yet. Add one above.</p>
             )}
           </div>

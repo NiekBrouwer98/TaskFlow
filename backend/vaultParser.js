@@ -172,15 +172,19 @@ export function getTasksByTopic(data) {
   return { bySection, byProject, byTaskType };
 }
 
-export function getTodaySummary(data) {
-  const today = new Date().toISOString().slice(0, 10);
-  const withDateToday = data.allTasks.filter((t) => t.due === today || t.start === today);
-  const dueToday = withDateToday.filter((t) => t.due === today);
-  const scheduledToday = withDateToday.filter((t) => t.start === today);
+export function getTodaySummary(data, todayLocal) {
+  const today = todayLocal || new Date().toISOString().slice(0, 10);
+  const open = data.allTasks.filter((t) => !t.done);
+  const dueToday = open.filter((t) => t.due === today);
+  const scheduledToday = open.filter((t) => t.start === today && t.due !== today);
+  const overdue = open.filter((t) => t.due && t.due < today);
+  // overdue first so past deadlines sort to the top
+  const allRelevant = [...new Set([...overdue, ...dueToday, ...scheduledToday])];
   return {
     date: today,
     dueToday,
     scheduledToday,
-    allRelevant: [...new Set([...dueToday, ...scheduledToday])],
+    overdue,
+    allRelevant,
   };
 }

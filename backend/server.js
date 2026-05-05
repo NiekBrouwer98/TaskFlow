@@ -155,8 +155,8 @@ app.get('/api/planning', async (req, res) => {
 
 app.get('/api/today', async (_, res) => {
   const data = await getDataAsync();
-  const summary = getTodaySummary(data);
   const today = getTodayLocal();
+  const summary = getTodaySummary(data, today);
   const scheduledSlots = getSchedulesInRange(today, today);
   const googleEvents = await getGoogleCalendarEvents(today);
   res.json({ ...summary, scheduledSlots, googleEvents });
