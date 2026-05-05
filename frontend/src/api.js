@@ -69,6 +69,38 @@ export async function deleteSchedule(taskKey, date) {
   return r.json();
 }
 
+export async function getQuickTodos(date) {
+  const r = await fetch(`${API}/quick-todos?date=${encodeURIComponent(date)}`);
+  if (!r.ok) throw new Error('Failed to load quick todos');
+  return r.json();
+}
+
+export async function addQuickTodo(date, text) {
+  const r = await fetch(`${API}/quick-todos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date, text }),
+  });
+  if (!r.ok) throw new Error('Failed to add quick todo');
+  return r.json();
+}
+
+export async function updateQuickTodo(id, updates) {
+  const r = await fetch(`${API}/quick-todos/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
+  if (!r.ok) throw new Error('Failed to update quick todo');
+  return r.json();
+}
+
+export async function deleteQuickTodo(id) {
+  const r = await fetch(`${API}/quick-todos/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (!r.ok) throw new Error('Failed to delete quick todo');
+  return r.json();
+}
+
 export async function refresh() {
   const r = await fetch(`${API}/refresh`, { method: 'POST' });
   if (!r.ok) throw new Error('Failed to refresh');

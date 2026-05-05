@@ -8,6 +8,7 @@ import { fetchIcsEvents, fetchIcsEventsForRange, getOutlookComEvents, getEventsF
 import { getGoogleCalendarEvents, isGoogleCalendarConfigured } from './googleCalendarService.js';
 import { getTaskKey, getSchedulesInRange, addOrUpdateSchedule, removeSchedule } from './scheduleStore.js';
 import { getMeetingBlocks, addMeetingBlock, updateMeetingBlock, removeMeetingBlock } from './meetingBlocksStore.js';
+import { getTodosForDate, addTodo, updateTodo, deleteTodo } from './quickTodosStore.js';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -277,6 +278,32 @@ app.delete('/api/schedule', (req, res) => {
     return res.status(400).json({ error: 'taskKey and date required' });
   }
   removeSchedule(taskKey, date);
+  res.json({ ok: true });
+});
+
+// Quick to-dos: ephemeral daily checklist stored in backend/quick-todos.json
+app.get('/api/quick-todos', (req, res) => {
+  const date = req.query.date || getTodayLocal();
+  res.json({ todos: getTodosForDate(date) });
+});
+
+app.post('/api/quick-todos', (req, res) => {
+  const { date, text } = req.body || {};
+  if (!date || !text?.trim()) {
+    return res.status(400).json({ error: 'date and text required' });
+  }
+  const todo = addTodo({ date, text: text.trim() });
+  res.json(todo);
+});
+
+app.patch('/api/quick-todos/:id', (req, res) => {
+  const todo = updateTodo(req.params.id, req.body || {});
+  if (!todo) return res.status(404).json({ error: 'Not found' });
+  res.json(todo);
+});
+
+app.delete('/api/quick-todos/:id', (req, res) => {
+  deleteTodo(req.params.id);
   res.json({ ok: true });
 });
 
