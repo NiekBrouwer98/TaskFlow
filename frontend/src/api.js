@@ -81,7 +81,11 @@ export async function addQuickTodo(date, text) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ date, text }),
   });
-  if (!r.ok) throw new Error('Failed to add quick todo');
+  if (!r.ok) {
+    let msg = `HTTP ${r.status}`;
+    try { const j = await r.json(); if (j.error) msg = j.error; } catch (_) {}
+    throw new Error(msg);
+  }
   return r.json();
 }
 

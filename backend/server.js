@@ -292,8 +292,13 @@ app.post('/api/quick-todos', (req, res) => {
   if (!date || !text?.trim()) {
     return res.status(400).json({ error: 'date and text required' });
   }
-  const todo = addTodo({ date, text: text.trim() });
-  res.json(todo);
+  try {
+    const todo = addTodo({ date, text: text.trim() });
+    res.json(todo);
+  } catch (e) {
+    console.error('quick-todos POST error:', e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.patch('/api/quick-todos/:id', (req, res) => {

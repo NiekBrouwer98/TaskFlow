@@ -74,7 +74,7 @@ export default function Today() {
       setQuickTodos(prev => [...prev, todo]);
       setNewTodoText('');
     } catch (e) {
-      setAddError('Could not save — is the backend running?');
+      setAddError(`Could not save: ${e.message}`);
     } finally {
       setAddingTodo(false);
     }
