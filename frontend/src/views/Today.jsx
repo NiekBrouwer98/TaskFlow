@@ -28,13 +28,21 @@ function getTodayDateStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-let nextId = 1;
+const STORAGE_KEY = 'sticky-todos';
+
+function loadSticky() {
+  try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
+}
+
+function saveSticky(todos) {
+  try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(todos)); } catch {}
+}
 
 export default function Today() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [quickTodos, setQuickTodos] = useState([]);
+  const [quickTodos, setQuickTodos] = useState(loadSticky);
   const [newTodoText, setNewTodoText] = useState('');
 
   const dateStr = getTodayDateStr();
@@ -55,6 +63,10 @@ export default function Today() {
     load();
   }, []);
 
+  useEffect(() => {
+    saveSticky(quickTodos);
+  }, [quickTodos]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
@@ -68,7 +80,7 @@ export default function Today() {
   const handleAddTodo = () => {
     const text = newTodoText.trim();
     if (!text) return;
-    setQuickTodos(prev => [...prev, { id: nextId++, text, done: false }]);
+    setQuickTodos(prev => [...prev, { id: Date.now(), text, done: false }]);
     setNewTodoText('');
   };
 
