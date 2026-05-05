@@ -137,7 +137,7 @@ export default function Today() {
       )}
 
       <section className="section">
-        <h2 className="section-title">Quick to-dos</h2>
+        <h2 className="section-title">Sticky note tasks</h2>
         <div className="card">
           <div className="card-body">
             <div className="quick-todo-input-row">
