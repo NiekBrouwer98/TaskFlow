@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getToday, refresh } from '../api';
+import { getToday, refresh, getQuickTodos, addQuickTodo, updateQuickTodo, deleteQuickTodo } from '../api';
 import '../App.css';
 
 function TaskItem({ task }) {
@@ -18,16 +18,30 @@ function TaskItem({ task }) {
   );
 }
 
+function getTodayDateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export default function Today() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [quickTodos, setQuickTodos] = useState([]);
+  const [newTodoText, setNewTodoText] = useState('');
+  const [addingTodo, setAddingTodo] = useState(false);
+
+  const dateStr = getTodayDateStr();
 
   const load = async () => {
     setLoading(true);
     try {
-      const todayData = await getToday();
+      const [todayData, todosData] = await Promise.all([
+        getToday(),
+        getQuickTodos(dateStr),
+      ]);
       setData(todayData);
+      setQuickTodos(todosData.todos || []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -49,6 +63,39 @@ export default function Today() {
     }
   };
 
+  const handleAddTodo = async () => {
+    const text = newTodoText.trim();
+    if (!text) return;
+    setAddingTodo(true);
+    try {
+      const todo = await addQuickTodo(dateStr, text);
+      setQuickTodos(prev => [...prev, todo]);
+      setNewTodoText('');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setAddingTodo(false);
+    }
+  };
+
+  const handleToggleTodo = async (todo) => {
+    try {
+      const updated = await updateQuickTodo(todo.id, { done: !todo.done });
+      setQuickTodos(prev => prev.map(t => t.id === todo.id ? updated : t));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteTodo = async (id) => {
+    try {
+      await deleteQuickTodo(id);
+      setQuickTodos(prev => prev.filter(t => t.id !== id));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   if (loading) {
     return (
       <div className="page">
@@ -61,7 +108,6 @@ export default function Today() {
   const tasks = data?.allRelevant ?? [];
   const scheduledSlots = data?.scheduledSlots ?? [];
   const googleEvents = data?.googleEvents ?? [];
-  // Scheduled slots sorted by start time for display
   const sortedSlots = [...scheduledSlots].sort((a, b) =>
     (a.startTime || '').localeCompare(b.startTime || '')
   );
@@ -105,6 +151,57 @@ export default function Today() {
           </div>
         </section>
       )}
+
+      <section className="section">
+        <h2 className="section-title">Quick to-dos</h2>
+        <div className="card">
+          <div className="card-body">
+            <div className="quick-todo-input-row">
+              <input
+                className="quick-todo-input"
+                type="text"
+                placeholder="Add a quick to-do…"
+                value={newTodoText}
+                onChange={e => setNewTodoText(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAddTodo()}
+                disabled={addingTodo}
+              />
+              <button
+                className="quick-todo-add-btn"
+                onClick={handleAddTodo}
+                disabled={addingTodo || !newTodoText.trim()}
+              >
+                Add
+              </button>
+            </div>
+            {quickTodos.length > 0 && (
+              <ul className="quick-todo-list">
+                {quickTodos.map(todo => (
+                  <li key={todo.id} className={`quick-todo-item ${todo.done ? 'done' : ''}`}>
+                    <input
+                      type="checkbox"
+                      className="task-checkbox"
+                      checked={todo.done}
+                      onChange={() => handleToggleTodo(todo)}
+                    />
+                    <span className="quick-todo-text">{todo.text}</span>
+                    <button
+                      className="quick-todo-delete"
+                      onClick={() => handleDeleteTodo(todo.id)}
+                      title="Remove"
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {quickTodos.length === 0 && (
+              <p className="empty-state small">No quick to-dos yet. Add one above.</p>
+            )}
+          </div>
+        </div>
+      </section>
 
       <section className="section">
         <h2 className="section-title">Tasks for today</h2>
