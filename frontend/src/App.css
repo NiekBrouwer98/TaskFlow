@@ -1299,3 +1299,22 @@
   color: #c00;
   background: rgba(200, 0, 0, 0.08);
 }
+
+.quick-todo-grip {
+  font-size: 1rem;
+  color: var(--text-tertiary);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.12s;
+  flex-shrink: 0;
+  line-height: 1;
+  user-select: none;
+}
+
+.quick-todo-item:hover .quick-todo-grip {
+  opacity: 1;
+}
+
+.quick-todo-item[draggable]:active {
+  opacity: 0.5;
+}

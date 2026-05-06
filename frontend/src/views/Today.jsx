@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getToday, refresh } from '../api';
 import '../App.css';
 
@@ -44,6 +44,7 @@ export default function Today() {
   const [refreshing, setRefreshing] = useState(false);
   const [quickTodos, setQuickTodos] = useState(loadSticky);
   const [newTodoText, setNewTodoText] = useState('');
+  const dragId = useRef(null);
 
   const dateStr = getTodayDateStr();
 
@@ -90,6 +91,21 @@ export default function Today() {
 
   const handleDeleteTodo = (id) => {
     setQuickTodos(prev => prev.filter(t => t.id !== id));
+  };
+
+  const handleDragStart = (id) => { dragId.current = id; };
+
+  const handleDragOver = (e, overId) => {
+    e.preventDefault();
+    if (dragId.current === overId) return;
+    setQuickTodos(prev => {
+      const from = prev.findIndex(t => t.id === dragId.current);
+      const to   = prev.findIndex(t => t.id === overId);
+      if (from === -1 || to === -1) return prev;
+      const next = [...prev];
+      next.splice(to, 0, next.splice(from, 1)[0]);
+      return next;
+    });
   };
 
   if (loading) {
@@ -173,7 +189,14 @@ export default function Today() {
             {quickTodos.length > 0 && (
               <ul className="quick-todo-list">
                 {quickTodos.map(todo => (
-                  <li key={todo.id} className={`quick-todo-item ${todo.done ? 'done' : ''}`}>
+                  <li
+                    key={todo.id}
+                    className={`quick-todo-item ${todo.done ? 'done' : ''}`}
+                    draggable
+                    onDragStart={() => handleDragStart(todo.id)}
+                    onDragOver={e => handleDragOver(e, todo.id)}
+                  >
+                    <span className="quick-todo-grip" title="Drag to reorder">⠿</span>
                     <input
                       type="checkbox"
                       className="task-checkbox"
