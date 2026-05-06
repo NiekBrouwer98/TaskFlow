@@ -1,7 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import cron from 'node-cron';
-import notifier from 'node-notifier';
 import { config } from './config.js';
 import { loadAllTasks, getOpenTasks, getTasksByPriority, getTasksByTopic, getTodaySummary } from './vaultParser.js';
 import { fetchIcsEvents, fetchIcsEventsForRange, getOutlookComEvents, getEventsFromIcsFile, getEventsFromIcsFileForRange } from './calendarService.js';
@@ -312,50 +310,10 @@ app.delete('/api/quick-todos/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-async function sendMorningReminder() {
-  const data = await getDataAsync();
-  const summary = getTodaySummary(data);
-  const taskCount = summary.allRelevant.length;
-  const today = getTodayLocal();
-  let outlookCount = 0;
-  const cal = config.calendar || {};
-  if (cal.outlookIcsUrl) {
-    const ics = await fetchIcsEvents(cal.outlookIcsUrl, cal.outlookIcsAuth || null, today);
-    outlookCount += ics.length;
-  }
-  if (cal.outlookIcsFile) {
-    outlookCount += getEventsFromIcsFile(cal.outlookIcsFile, today).length;
-  }
-  if (cal.outlookUseCom) {
-    outlookCount += (await getOutlookComEvents(today)).length;
-  }
-  const parts = [];
-  if (taskCount > 0) parts.push(`${taskCount} task(s)`);
-  if (outlookCount > 0) parts.push(`${outlookCount} meeting(s)`);
-  const message =
-    parts.length === 0
-      ? "Good morning. No tasks or meetings scheduled for today."
-      : `Good morning. Today: ${parts.join(', ')}. Open the task app for your full overview.`;
-  notifier.notify({
-    title: 'Your day',
-    message,
-    sound: true,
-  });
-}
-
-// Weekdays at 9:00 (configurable via config.reminderTime and config.reminderTimezone)
-const [reminderHour, reminderMin] = config.reminderTime.split(':').map(Number);
-cron.schedule(
-  `${reminderMin ?? 0} ${reminderHour ?? 9} * * 1-5`,
-  sendMorningReminder,
-  { timezone: config.reminderTimezone }
-);
-
 const PORT = config.port;
 app.listen(PORT, () => {
   console.log(`Task app backend running at http://localhost:${PORT}`);
   console.log(`Vault path: ${config.vaultPath}`);
-  console.log(`Reminder: weekdays at ${config.reminderTime}`);
   if (config.calendar?.outlookUseCom) {
     console.log('Outlook COM: enabled (calendar events from Outlook desktop)');
   } else if (process.platform === 'win32') {

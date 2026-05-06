@@ -139,7 +139,7 @@ export default function Today() {
         </button>
       </div>
       <p className="page-subtitle">
-        Your day at a glance. A reminder is sent at 9:00 on weekdays with a summary.
+        Your day at a glance.
       </p>
 
       {googleEvents.length > 0 && (
