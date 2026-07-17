@@ -189,10 +189,12 @@ export default function Today() {
               <ul className="today-scheduled-list">
                 {sortedSlots.map((slot, i) => (
                   <li key={`${slot.taskKey}-${slot.date}-${i}`} className="today-scheduled-item">
-                    <span className="today-scheduled-time">
-                      {slot.startTime} – {slot.endTime}
-                    </span>
-                    <span className="today-scheduled-text">{slot.text || 'Task'}</span>
+                    <div className="today-scheduled-main">
+                      <span className="today-scheduled-time">
+                        {slot.startTime} – {slot.endTime}
+                      </span>
+                      <span className="today-scheduled-text">{slot.text || 'Task'}</span>
+                    </div>
                     {slot.project && <span className="today-scheduled-project">{slot.project}</span>}
                   </li>
                 ))}
