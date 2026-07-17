@@ -133,8 +133,10 @@ export default function Today() {
                     <ul className="brief-list">
                       {brief.dueOrOverdue.map((item, i) => (
                         <li key={i} className="brief-item">
-                          <span className="brief-item-project">{item.project}</span>
-                          <span className="brief-item-action">{item.action}</span>
+                          <div className="brief-item-body">
+                            <span className="brief-item-action">{item.action}</span>
+                            <span className="brief-item-project">{item.project}</span>
+                          </div>
                           <span className="brief-item-status">{item.status}</span>
                         </li>
                       ))}
@@ -147,8 +149,10 @@ export default function Today() {
                     <ul className="brief-list">
                       {brief.newlyDiscovered.map((item, i) => (
                         <li key={i} className="brief-item">
-                          <span className="brief-item-project">{item.project}</span>
-                          <span className="brief-item-action">{item.action}</span>
+                          <div className="brief-item-body">
+                            <span className="brief-item-action">{item.action}</span>
+                            <span className="brief-item-project">{item.project}</span>
+                          </div>
                         </li>
                       ))}
                     </ul>
@@ -194,7 +198,7 @@ export default function Today() {
                 ))}
               </ul>
             )}
-            {tasks.length > 0 && (
+            {!briefIsToday && tasks.length > 0 && (
               <ul className="today-tasks-list">
                 {tasks.map((task, i) => (
                   <li key={task.taskKey || i}>
@@ -203,8 +207,8 @@ export default function Today() {
                 ))}
               </ul>
             )}
-            {sortedSlots.length === 0 && tasks.length === 0 && (
-              <p className="empty-state">No tasks due or scheduled for today.</p>
+            {sortedSlots.length === 0 && (briefIsToday || tasks.length === 0) && (
+              <p className="empty-state">No time slots scheduled for today.</p>
             )}
           </div>
         </div>
