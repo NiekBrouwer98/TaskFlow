@@ -1319,6 +1319,78 @@
   opacity: 0.5;
 }
 
+/* Manual task form in schedule sidebar */
+.manual-task-form {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.manual-task-input {
+  flex: 1;
+  padding: 5px 8px;
+  font-size: 0.8rem;
+  border: 1px solid var(--color-border, #ddd);
+  border-radius: 4px;
+  background: var(--color-bg, #fff);
+  color: var(--color-text, #1a1a1a);
+}
+
+.manual-task-input:focus {
+  outline: none;
+  border-color: var(--color-accent, #6366f1);
+}
+
+.manual-task-add-btn {
+  padding: 5px 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  background: var(--color-accent, #6366f1);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.manual-task-add-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.manual-task-add-btn:not(:disabled):hover {
+  opacity: 0.85;
+}
+
+.manual-task-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted, #aaa);
+  font-size: 1rem;
+  padding: 0 2px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.schedule-task-item.manual:hover .manual-task-remove {
+  opacity: 1;
+}
+
+.manual-task-remove:hover {
+  color: #e05050;
+}
+
+.schedule-sidebar-section-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted, #aaa);
+  margin: 8px 0 4px;
+}
+
 /* Daily brief section */
 .brief-content {
   display: flex;

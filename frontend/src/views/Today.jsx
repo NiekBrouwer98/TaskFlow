@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { getToday, refresh, getDailyBrief } from '../api';
 import '../App.css';
 
@@ -28,24 +28,11 @@ function getTodayDateStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-const STORAGE_KEY = 'sticky-todos';
-
-function loadSticky() {
-  try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
-}
-
-function saveSticky(todos) {
-  try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(todos)); } catch {}
-}
-
 export default function Today() {
   const [data, setData] = useState(null);
   const [brief, setBrief] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [quickTodos, setQuickTodos] = useState(loadSticky);
-  const [newTodoText, setNewTodoText] = useState('');
-  const dragId = useRef(null);
 
   const dateStr = getTodayDateStr();
 
@@ -61,7 +48,6 @@ export default function Today() {
   };
 
   useEffect(() => { load(); }, []);
-  useEffect(() => { saveSticky(quickTodos); }, [quickTodos]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -71,36 +57,6 @@ export default function Today() {
     } finally {
       setRefreshing(false);
     }
-  };
-
-  const handleAddTodo = () => {
-    const text = newTodoText.trim();
-    if (!text) return;
-    setQuickTodos(prev => [...prev, { id: Date.now(), text, done: false }]);
-    setNewTodoText('');
-  };
-
-  const handleToggleTodo = (id) => {
-    setQuickTodos(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
-  };
-
-  const handleDeleteTodo = (id) => {
-    setQuickTodos(prev => prev.filter(t => t.id !== id));
-  };
-
-  const handleDragStart = (id) => { dragId.current = id; };
-
-  const handleDragOver = (e, overId) => {
-    e.preventDefault();
-    if (dragId.current === overId) return;
-    setQuickTodos(prev => {
-      const from = prev.findIndex(t => t.id === dragId.current);
-      const to   = prev.findIndex(t => t.id === overId);
-      if (from === -1 || to === -1) return prev;
-      const next = [...prev];
-      next.splice(to, 0, next.splice(from, 1)[0]);
-      return next;
-    });
   };
 
   if (loading) {
@@ -216,64 +172,6 @@ export default function Today() {
               <p className="empty-state small">
                 No brief yet today. Run <code>/daily-brief</code> in Claude to generate one.
               </p>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <section className="section">
-        <h2 className="section-title">Sticky note tasks</h2>
-        <div className="card">
-          <div className="card-body">
-            <div className="quick-todo-input-row">
-              <input
-                className="quick-todo-input"
-                type="text"
-                placeholder="Add a quick to-do…"
-                value={newTodoText}
-                onChange={e => setNewTodoText(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleAddTodo()}
-                autoFocus
-              />
-              <button
-                className="quick-todo-add-btn"
-                onClick={handleAddTodo}
-                disabled={!newTodoText.trim()}
-              >
-                Add
-              </button>
-            </div>
-            {quickTodos.length > 0 && (
-              <ul className="quick-todo-list">
-                {quickTodos.map(todo => (
-                  <li
-                    key={todo.id}
-                    className={`quick-todo-item ${todo.done ? 'done' : ''}`}
-                    draggable
-                    onDragStart={() => handleDragStart(todo.id)}
-                    onDragOver={e => handleDragOver(e, todo.id)}
-                  >
-                    <span className="quick-todo-grip" title="Drag to reorder">⠿</span>
-                    <input
-                      type="checkbox"
-                      className="task-checkbox"
-                      checked={todo.done}
-                      onChange={() => handleToggleTodo(todo.id)}
-                    />
-                    <span className="quick-todo-text">{todo.text}</span>
-                    <button
-                      className="quick-todo-delete"
-                      onClick={() => handleDeleteTodo(todo.id)}
-                      title="Remove"
-                    >
-                      ×
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {quickTodos.length === 0 && (
-              <p className="empty-state small">No quick to-dos yet. Add one above.</p>
             )}
           </div>
         </div>

@@ -331,6 +331,8 @@ export default function Schedule() {
   const [durationPicker, setDurationPicker] = useState(null);
   const [taskSearchQuery, setTaskSearchQuery] = useState('');
   const [showMeetingModal, setShowMeetingModal] = useState(false);
+  const [manualTasks, setManualTasks] = useState([]);
+  const [manualInput, setManualInput] = useState('');
 
   const start = view === 'week' ? weekStart(currentDate) : currentDate;
   const end = view === 'week' ? (() => {
@@ -382,6 +384,13 @@ export default function Schedule() {
     await deleteMeetingBlock(id);
     const res = await getMeetingBlocks();
     setMeetingBlocks(res.blocks || []);
+  };
+
+  const handleAddManual = () => {
+    const text = manualInput.trim();
+    if (!text) return;
+    setManualTasks(prev => [...prev, { taskKey: `manual-${Date.now()}`, text, project: '' }]);
+    setManualInput('');
   };
 
   const onDragStart = (e, task) => {
@@ -538,7 +547,54 @@ export default function Schedule() {
       <div className="schedule-layout">
         <aside className="schedule-sidebar">
           <h3 className="schedule-sidebar-title">Tasks</h3>
-          <p className="schedule-sidebar-hint">Drag open tasks to a time slot</p>
+          <p className="schedule-sidebar-hint">Drag tasks to a time slot</p>
+
+          <div className="manual-task-form">
+            <input
+              type="text"
+              className="manual-task-input"
+              placeholder="Add manual task\u2026"
+              value={manualInput}
+              onChange={(e) => setManualInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddManual()}
+            />
+            <button
+              type="button"
+              className="manual-task-add-btn"
+              onClick={handleAddManual}
+              disabled={!manualInput.trim()}
+            >
+              +
+            </button>
+          </div>
+
+          {manualTasks.length > 0 && (
+            <>
+              <p className="schedule-sidebar-section-label">Manual</p>
+              <ul className="schedule-task-list">
+                {manualTasks.map((t) => (
+                  <li
+                    key={t.taskKey}
+                    className={`schedule-task-item manual ${dragging?.taskKey === t.taskKey ? 'dragging' : ''}`}
+                    draggable
+                    onDragStart={(e) => onDragStart(e, t)}
+                    onDragEnd={onDragEnd}
+                  >
+                    <span className="schedule-task-text">{t.text}</span>
+                    <button
+                      type="button"
+                      className="manual-task-remove"
+                      onClick={() => setManualTasks(prev => prev.filter(m => m.taskKey !== t.taskKey))}
+                      title="Remove"
+                    >
+                      \u00d7
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
           <input
             type="search"
             className="schedule-task-search"
@@ -547,6 +603,9 @@ export default function Schedule() {
             onChange={(e) => setTaskSearchQuery(e.target.value)}
             aria-label="Search tasks"
           />
+          {(filteredOpenTasks.length > 0 || finishedTasks.length > 0) && (
+            <p className="schedule-sidebar-section-label">From vault</p>
+          )}
           <ul className="schedule-task-list">
             {filteredOpenTasks.map((t, i) => (
               <li
@@ -571,7 +630,7 @@ export default function Schedule() {
             ))}
           </ul>
           {openTasks.length === 0 && finishedTasks.length === 0 && (
-            <p className="empty-state small">No tasks</p>
+            <p className="empty-state small">No vault tasks</p>
           )}
           {openTasks.length + finishedTasks.length > 0 && filteredOpenTasks.length === 0 && finishedTasks.length === 0 && (
             <p className="empty-state small">No tasks match your search</p>
