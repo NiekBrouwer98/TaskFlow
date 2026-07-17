@@ -9,6 +9,7 @@ import { getMeetingBlocks, addMeetingBlock, updateMeetingBlock, removeMeetingBlo
 import { getTodosForDate, addTodo, updateTodo, deleteTodo } from './quickTodosStore.js';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { readFileSync, existsSync } from 'fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -308,6 +309,18 @@ app.patch('/api/quick-todos/:id', (req, res) => {
 app.delete('/api/quick-todos/:id', (req, res) => {
   deleteTodo(req.params.id);
   res.json({ ok: true });
+});
+
+// Daily brief — written by the daily-brief skill via Obsidian MCP
+app.get('/api/daily-brief', (_, res) => {
+  const briefPath = join(config.vaultPath, 'PROJECTS', 'Housekeeping', 'daily-brief.json');
+  if (!existsSync(briefPath)) return res.json(null);
+  try {
+    const brief = JSON.parse(readFileSync(briefPath, 'utf8'));
+    res.json(brief);
+  } catch {
+    res.json(null);
+  }
 });
 
 const PORT = config.port;

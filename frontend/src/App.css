@@ -1318,3 +1318,100 @@
 .quick-todo-item[draggable]:active {
   opacity: 0.5;
 }
+
+/* Daily brief section */
+.brief-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.brief-top-priority {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--color-accent-soft, rgba(99, 102, 241, 0.08));
+  border-left: 3px solid var(--color-accent, #6366f1);
+  border-radius: 4px;
+}
+
+.brief-priority-text {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--color-text, #1a1a1a);
+}
+
+.brief-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.brief-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted, #888);
+}
+
+.brief-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.brief-item {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  font-size: 0.875rem;
+  color: var(--color-text, #1a1a1a);
+}
+
+.brief-item-project {
+  font-weight: 600;
+  color: var(--color-text, #1a1a1a);
+  white-space: nowrap;
+}
+
+.brief-item-project::after {
+  content: ':';
+  margin-right: 2px;
+}
+
+.brief-item-action {
+  flex: 1;
+  color: var(--color-text-secondary, #555);
+}
+
+.brief-item-status {
+  font-size: 0.75rem;
+  color: #e05050;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.brief-item-reminder {
+  color: var(--color-text-secondary, #555);
+}
+
+.brief-item-reminder::before {
+  content: '→ ';
+  color: var(--color-text-muted, #888);
+}
+
+.brief-generated {
+  font-size: 0.7rem;
+  color: var(--color-text-muted, #aaa);
+  margin: 0;
+}
+
+.empty-state.small {
+  font-size: 0.85rem;
+  padding: 8px 0;
+}

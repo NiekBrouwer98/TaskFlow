@@ -69,6 +69,12 @@ export async function deleteSchedule(taskKey, date) {
   return r.json();
 }
 
+export async function getDailyBrief() {
+  const r = await fetch(`${API}/daily-brief`);
+  if (!r.ok) return null;
+  return r.json();
+}
+
 export async function getQuickTodos(date) {
   const r = await fetch(`${API}/quick-todos?date=${encodeURIComponent(date)}`);
   if (!r.ok) throw new Error('Failed to load quick todos');

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getToday, refresh } from '../api';
+import { getToday, refresh, getDailyBrief } from '../api';
 import '../App.css';
 
 function TaskItem({ task }) {
@@ -40,6 +40,7 @@ function saveSticky(todos) {
 
 export default function Today() {
   const [data, setData] = useState(null);
+  const [brief, setBrief] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [quickTodos, setQuickTodos] = useState(loadSticky);
@@ -50,23 +51,17 @@ export default function Today() {
 
   const load = async () => {
     setLoading(true);
-    try {
-      const todayData = await getToday();
-      setData(todayData);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    const [todayResult, briefResult] = await Promise.allSettled([
+      getToday(),
+      getDailyBrief(),
+    ]);
+    if (todayResult.status === 'fulfilled') setData(todayResult.value);
+    if (briefResult.status === 'fulfilled') setBrief(briefResult.value);
+    setLoading(false);
   };
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  useEffect(() => {
-    saveSticky(quickTodos);
-  }, [quickTodos]);
+  useEffect(() => { load(); }, []);
+  useEffect(() => { saveSticky(quickTodos); }, [quickTodos]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -124,8 +119,10 @@ export default function Today() {
     (a.startTime || '').localeCompare(b.startTime || '')
   );
 
-  function formatEventTime(isoString, allDay) {
-    if (allDay || !isoString) return 'All day';
+  // Only show brief if it was generated today
+  const briefIsToday = brief?.date === dateStr;
+
+  function formatEventTime(isoString) {
     const d = new Date(isoString);
     return d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
   }
@@ -151,9 +148,7 @@ export default function Today() {
                 {googleEvents.map((event, i) => (
                   <li key={i} className="today-scheduled-item">
                     <span className="today-scheduled-time">
-                      {event.allDay
-                        ? 'All day'
-                        : `${formatEventTime(event.start)} – ${formatEventTime(event.end)}`}
+                      {event.allDay ? 'All day' : `${formatEventTime(event.start)} – ${formatEventTime(event.end)}`}
                     </span>
                     <span className="today-scheduled-text">{event.title}</span>
                   </li>
@@ -163,6 +158,68 @@ export default function Today() {
           </div>
         </section>
       )}
+
+      <section className="section">
+        <h2 className="section-title">Daily brief</h2>
+        <div className="card">
+          <div className="card-body">
+            {briefIsToday ? (
+              <div className="brief-content">
+                {brief.topPriority && (
+                  <div className="brief-top-priority">
+                    <span className="brief-label">Top priority</span>
+                    <span className="brief-priority-text">{brief.topPriority}</span>
+                  </div>
+                )}
+                {brief.dueOrOverdue?.length > 0 && (
+                  <div className="brief-section">
+                    <span className="brief-label">Due / overdue</span>
+                    <ul className="brief-list">
+                      {brief.dueOrOverdue.map((item, i) => (
+                        <li key={i} className="brief-item">
+                          <span className="brief-item-project">{item.project}</span>
+                          <span className="brief-item-action">{item.action}</span>
+                          <span className="brief-item-status">{item.status}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {brief.newlyDiscovered?.length > 0 && (
+                  <div className="brief-section">
+                    <span className="brief-label">Needs triage</span>
+                    <ul className="brief-list">
+                      {brief.newlyDiscovered.map((item, i) => (
+                        <li key={i} className="brief-item">
+                          <span className="brief-item-project">{item.project}</span>
+                          <span className="brief-item-action">{item.action}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {brief.reminders?.length > 0 && (
+                  <div className="brief-section">
+                    <span className="brief-label">Reminders</span>
+                    <ul className="brief-list">
+                      {brief.reminders.map((r, i) => (
+                        <li key={i} className="brief-item brief-item-reminder">{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <p className="brief-generated">
+                  Generated {new Date(brief.generatedAt).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            ) : (
+              <p className="empty-state small">
+                No brief yet today. Run <code>/daily-brief</code> in Claude to generate one.
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
 
       <section className="section">
         <h2 className="section-title">Sticky note tasks</h2>
