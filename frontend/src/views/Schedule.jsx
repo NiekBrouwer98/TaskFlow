@@ -553,19 +553,11 @@ export default function Schedule() {
             <input
               type="text"
               className="manual-task-input"
-              placeholder="Add manual task\u2026"
+              placeholder="Add manual task..."
               value={manualInput}
               onChange={(e) => setManualInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAddManual()}
             />
-            <button
-              type="button"
-              className="manual-task-add-btn"
-              onClick={handleAddManual}
-              disabled={!manualInput.trim()}
-            >
-              +
-            </button>
           </div>
 
           {manualTasks.length > 0 && (
@@ -598,7 +590,7 @@ export default function Schedule() {
           <input
             type="search"
             className="schedule-task-search"
-            placeholder="Search tasks\u2026"
+            placeholder="Search tasks..."
             value={taskSearchQuery}
             onChange={(e) => setTaskSearchQuery(e.target.value)}
             aria-label="Search tasks"
