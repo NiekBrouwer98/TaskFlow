@@ -587,7 +587,7 @@ export default function Schedule() {
                       onClick={() => setManualTasks(prev => prev.filter(m => m.taskKey !== t.taskKey))}
                       title="Remove"
                     >
-                      \u00d7
+                      &times;
                     </button>
                   </li>
                 ))}
