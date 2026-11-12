@@ -137,10 +137,30 @@ function buildBlocksForDay(dateYmd, schedules, meetingInstances) {
       type: 'scheduled',
       taskKey: s.taskKey,
       project: s.project,
+      done: s.done || false,
     });
   });
   blocks.sort((a, b) => a.startRow - b.startRow);
-  return blocks;
+  return assignOverlapColumns(blocks);
+}
+
+function assignOverlapColumns(blocks) {
+  if (!blocks.length) return blocks;
+  const colEnds = [];
+  const colIdxArr = blocks.map((block) => {
+    let ci = colEnds.findIndex((end) => end <= block.startRow);
+    if (ci === -1) ci = colEnds.length;
+    colEnds[ci] = block.endRow;
+    return ci;
+  });
+  const overlaps = (a, b) => a.startRow < b.endRow && b.startRow < a.endRow;
+  return blocks.map((block, i) => {
+    let maxCol = colIdxArr[i];
+    blocks.forEach((other, j) => {
+      if (i !== j && overlaps(block, other)) maxCol = Math.max(maxCol, colIdxArr[j]);
+    });
+    return { ...block, colIdx: colIdxArr[i], totalCols: maxCol + 1 };
+  });
 }
 
 function addMinutesToTime(timeStr, minutes) {
@@ -462,11 +482,14 @@ export default function Schedule() {
     setCurrentDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
   };
 
+  const SIDEBAR_PREVIEW = 8;
   const q = (taskSearchQuery || '').trim().toLowerCase();
   const filterTask = (t) =>
     !q || (t.text || '').toLowerCase().includes(q) || (t.project || '').toLowerCase().includes(q);
-  const filteredOpenTasks = openTasks.filter(filterTask);
-  const finishedTasks = allTasks.filter((t) => t.done && filterTask(t));
+  const matchingOpenTasks = openTasks.filter(filterTask);
+  const filteredOpenTasks = q ? matchingOpenTasks : matchingOpenTasks.slice(0, SIDEBAR_PREVIEW);
+  const finishedTasks = q ? allTasks.filter((t) => t.done && filterTask(t)) : [];
+  const hiddenCount = q ? 0 : Math.max(0, openTasks.length - SIDEBAR_PREVIEW);
   const taskKeyToTask = React.useMemo(() => {
     const m = {};
     (allTasks || []).forEach((t) => {
@@ -621,11 +644,14 @@ export default function Schedule() {
               </li>
             ))}
           </ul>
-          {openTasks.length === 0 && finishedTasks.length === 0 && (
+          {openTasks.length === 0 && (
             <p className="empty-state small">No vault tasks</p>
           )}
-          {openTasks.length + finishedTasks.length > 0 && filteredOpenTasks.length === 0 && finishedTasks.length === 0 && (
+          {q && matchingOpenTasks.length === 0 && finishedTasks.length === 0 && (
             <p className="empty-state small">No tasks match your search</p>
+          )}
+          {hiddenCount > 0 && (
+            <p className="schedule-sidebar-hint">{hiddenCount} more — search to find them</p>
           )}
         </aside>
 
@@ -685,7 +711,9 @@ export default function Schedule() {
               const blocks = buildBlocksForDay(dateYmd, schedules, instances);
               return blocks.map((block, i) => {
                 const task = block.taskKey ? taskKeyToTask[block.taskKey] : null;
-                const isFinished = task && task.done;
+                const isFinished = block.done || (task && task.done);
+                const widthPct = 100 / (block.totalCols || 1);
+                const leftPct = (block.colIdx || 0) * widthPct;
                 return (
                   <div
                     key={`${dateYmd}-${block.startRow}-${i}-${block.taskKey || block.meetingId || ''}`}
@@ -693,6 +721,9 @@ export default function Schedule() {
                     style={{
                       gridRow: `${block.startRow + 2} / span ${block.endRow - block.startRow}`,
                       gridColumn: colIndex + 2,
+                      width: `${widthPct}%`,
+                      marginLeft: `${leftPct}%`,
+                      justifySelf: 'start',
                     }}
                   >
                     <span className="schedule-block-title">{block.title}</span>

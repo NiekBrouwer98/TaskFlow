@@ -79,12 +79,6 @@ export async function deleteSchedule(taskKey, date) {
   return r.json();
 }
 
-export async function getDailyBrief() {
-  const r = await fetch(`${API}/daily-brief`);
-  if (!r.ok) return null;
-  return r.json();
-}
-
 // Streams one chat turn; calls onEvent for each {type: session|text|tool|error|done}
 export async function streamChat(message, sessionId, onEvent) {
   const r = await fetch(`${API}/chat`, {

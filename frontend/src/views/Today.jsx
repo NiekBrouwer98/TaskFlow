@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getToday, refresh, getDailyBrief, patchSchedule } from '../api';
+import { getToday, getTasks, refresh, patchSchedule, getQuickTodos, updateQuickTodo } from '../api';
 import CheckinChat from './CheckinChat';
 import '../App.css';
 
@@ -24,17 +24,85 @@ function TaskItem({ task }) {
   );
 }
 
-function getTodayDateStr() {
-  const d = new Date();
+function toYmd(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function getTodayDateStr() {
+  return toYmd(new Date());
+}
+
+function addDays(ymd, n) {
+  const d = new Date(ymd + 'T12:00:00');
+  d.setDate(d.getDate() + n);
+  return toYmd(d);
+}
+
+// Sunday of the current week (Monday-start weeks)
+function endOfWeek(ymd) {
+  const day = new Date(ymd + 'T12:00:00').getDay();
+  return addDays(ymd, day === 0 ? 0 : 7 - day);
+}
+
+// Today = overdue, due today or starting today; the rest by due (else start) date.
+function groupPlanned(openTasks, today) {
+  const tomorrow = addDays(today, 1);
+  const weekEnd = endOfWeek(today);
+  const groups = { today: [], tomorrow: [], week: [] };
+  for (const t of openTasks) {
+    const date = t.due || t.start;
+    if (!date) continue;
+    if ((t.due && t.due <= today) || t.start === today) groups.today.push(t);
+    else if (date === tomorrow) groups.tomorrow.push(t);
+    else if (date > tomorrow && date <= weekEnd) groups.week.push(t);
+  }
+  const byDate = (a, b) => (a.due || a.start).localeCompare(b.due || b.start);
+  groups.today.sort(byDate);
+  groups.week.sort(byDate);
+  return groups;
+}
+
+const PLANNED_LIMIT = 4;
+
+function PlannedGroup({ title, tasks, today, limit }) {
+  const [expanded, setExpanded] = useState(false);
+  const shown = limit && !expanded ? tasks.slice(0, limit) : tasks;
+  const hidden = tasks.length - shown.length;
+  return (
+    <div className="planned-group">
+      <p className="today-todos-label">{title}</p>
+      {tasks.length === 0 ? (
+        <p className="planned-empty">Nothing planned.</p>
+      ) : (
+        <ul className="today-tasks-list">
+          {shown.map((task, i) => (
+            <li key={task.taskKey || i}>
+              <TaskItem task={{ ...task, _today: today }} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {hidden > 0 && (
+        <button type="button" className="planned-more-btn" onClick={() => setExpanded(true)}>
+          {hidden} more…
+        </button>
+      )}
+      {expanded && limit && tasks.length > limit && (
+        <button type="button" className="planned-more-btn" onClick={() => setExpanded(false)}>
+          Show less
+        </button>
+      )}
+    </div>
+  );
 }
 
 export default function Today() {
   const [data, setData] = useState(null);
-  const [brief, setBrief] = useState(null);
+  const [openTasks, setOpenTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [slots, setSlots] = useState([]);
+  const [todos, setTodos] = useState([]);
 
   const dateStr = getTodayDateStr();
 
@@ -46,12 +114,14 @@ export default function Today() {
 
   // No loading flag, so the chat panel stays mounted while data refreshes.
   const reloadData = async () => {
-    const [todayResult, briefResult] = await Promise.allSettled([
+    const [todayResult, tasksResult, todosResult] = await Promise.allSettled([
       getToday(),
-      getDailyBrief(),
+      getTasks(),
+      getQuickTodos(dateStr),
     ]);
     if (todayResult.status === 'fulfilled') setData(todayResult.value);
-    if (briefResult.status === 'fulfilled') setBrief(briefResult.value);
+    if (tasksResult.status === 'fulfilled') setOpenTasks(tasksResult.value.openTasks || []);
+    if (todosResult.status === 'fulfilled') setTodos(todosResult.value.todos || []);
   };
 
   const reloadAfterChat = async () => {
@@ -86,7 +156,7 @@ export default function Today() {
     );
   }
 
-  const tasks = (data?.allRelevant ?? []).map(t => ({ ...t, _today: dateStr }));
+  const planned = groupPlanned(openTasks, dateStr);
   const googleEvents = data?.googleEvents ?? [];
 
   const toggleSlotDone = async (slot) => {
@@ -103,8 +173,16 @@ export default function Today() {
     }
   };
 
-  // Only show brief if it was generated today
-  const briefIsToday = brief?.date === dateStr;
+  const toggleTodoDone = async (todo) => {
+    const setDone = (done) =>
+      setTodos(prev => prev.map(t => (t.id === todo.id ? { ...t, done } : t)));
+    setDone(!todo.done);
+    try {
+      await updateQuickTodo(todo.id, { done: !todo.done });
+    } catch {
+      setDone(todo.done);
+    }
+  };
 
   function formatEventTime(isoString) {
     const d = new Date(isoString);
@@ -127,67 +205,12 @@ export default function Today() {
 
       <div className="today-two-col">
       <section className="section">
-        <h2 className="section-title">Daily brief</h2>
+        <h2 className="section-title">Planned</h2>
         <div className="card">
           <div className="card-body">
-            {briefIsToday ? (
-              <div className="brief-content">
-                {brief.topPriority && (
-                  <div className="brief-top-priority">
-                    <span className="brief-label">Top priority</span>
-                    <span className="brief-priority-text">{brief.topPriority}</span>
-                  </div>
-                )}
-                {brief.dueOrOverdue?.length > 0 && (
-                  <div className="brief-section">
-                    <span className="brief-label">Due / overdue</span>
-                    <ul className="brief-list">
-                      {brief.dueOrOverdue.map((item, i) => (
-                        <li key={i} className="brief-item">
-                          <div className="brief-item-body">
-                            <span className="brief-item-action">{item.action}</span>
-                            <span className="brief-item-project">{item.project}</span>
-                          </div>
-                          <span className="brief-item-status">{item.status}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {brief.newlyDiscovered?.length > 0 && (
-                  <div className="brief-section">
-                    <span className="brief-label">Needs triage</span>
-                    <ul className="brief-list">
-                      {brief.newlyDiscovered.map((item, i) => (
-                        <li key={i} className="brief-item">
-                          <div className="brief-item-body">
-                            <span className="brief-item-action">{item.action}</span>
-                            <span className="brief-item-project">{item.project}</span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {brief.reminders?.length > 0 && (
-                  <div className="brief-section">
-                    <span className="brief-label">Reminders</span>
-                    <ul className="brief-list">
-                      {brief.reminders.map((r, i) => (
-                        <li key={i} className="brief-item brief-item-reminder">{r}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                <p className="brief-generated">
-                  Generated {new Date(brief.generatedAt).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}
-                </p>
-              </div>
-            ) : (
-              <p className="empty-state small">
-                No brief yet today. Run <code>/daily-brief</code> in Claude to generate one.
-              </p>
-            )}
+            <PlannedGroup title="Today" tasks={planned.today} today={dateStr} />
+            <PlannedGroup title="Tomorrow" tasks={planned.tomorrow} today={dateStr} limit={PLANNED_LIMIT} />
+            <PlannedGroup title="Rest of the week" tasks={planned.week} today={dateStr} limit={PLANNED_LIMIT} />
           </div>
         </div>
       </section>
@@ -196,6 +219,27 @@ export default function Today() {
         <h2 className="section-title">Tasks for today</h2>
         <div className="card">
           <div className="card-body">
+            {todos.length > 0 && (
+              <>
+                <p className="today-todos-label">To-dos</p>
+                <ul className="today-scheduled-list today-todos-list">
+                  {todos.map((todo) => (
+                    <li key={todo.id} className={`today-scheduled-item${todo.done ? ' task-finished' : ''}`}>
+                      <button
+                        type="button"
+                        className={`today-slot-check${todo.done ? ' checked' : ''}`}
+                        onClick={() => toggleTodoDone(todo)}
+                        aria-label={todo.done ? 'Mark undone' : 'Mark done'}
+                      />
+                      <div className="today-scheduled-main">
+                        <span className="today-scheduled-text">{todo.text}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                {slots.length > 0 && <p className="today-todos-label">Schedule</p>}
+              </>
+            )}
             {slots.length > 0 && (
               <ul className="today-scheduled-list">
                 {slots.map((slot, i) => (
@@ -217,16 +261,7 @@ export default function Today() {
                 ))}
               </ul>
             )}
-            {!briefIsToday && tasks.length > 0 && (
-              <ul className="today-tasks-list">
-                {tasks.map((task, i) => (
-                  <li key={task.taskKey || i}>
-                    <TaskItem task={task} />
-                  </li>
-                ))}
-              </ul>
-            )}
-            {slots.length === 0 && (briefIsToday || tasks.length === 0) && (
+            {slots.length === 0 && todos.length === 0 && (
               <p className="empty-state">No time slots scheduled for today.</p>
             )}
           </div>

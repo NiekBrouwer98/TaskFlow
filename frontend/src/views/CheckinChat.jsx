@@ -23,17 +23,23 @@ function RichText({ text }) {
   );
 }
 
+const ROUTINES = {
+  checkin: { command: '/daily-checkin', title: 'Morning check-in', button: 'Start check-in' },
+  checkout: { command: '/daily-checkout', title: 'End-of-day check-out', button: 'Start check-out' },
+};
+
 export default function CheckinChat({ date, onTurnDone }) {
   const [messages, setMessages] = useState(() => loadSaved(date).messages || []);
   const [sessionId, setSessionId] = useState(() => loadSaved(date).sessionId || null);
+  const [mode, setMode] = useState(() => loadSaved(date).mode || null);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
   const listRef = useRef(null);
 
   useEffect(() => {
-    try { localStorage.setItem(storageKey(date), JSON.stringify({ sessionId, messages })); } catch {}
-  }, [date, sessionId, messages]);
+    try { localStorage.setItem(storageKey(date), JSON.stringify({ sessionId, messages, mode })); } catch {}
+  }, [date, sessionId, messages, mode]);
 
   useEffect(() => {
     const el = listRef.current;
@@ -74,27 +80,51 @@ export default function CheckinChat({ date, onTurnDone }) {
     }
   };
 
+  const start = (key) => {
+    setMode(key);
+    send(ROUTINES[key].command, { fresh: true, label: ROUTINES[key].button });
+  };
+
+  const startOver = () => {
+    setMessages([]);
+    setSessionId(null);
+    setMode(null);
+  };
+
+  const started = messages.length > 0 || busy;
+  // ponytail: fixed 14:00 switch; read checkout_reminder from config if it should follow it
+  const suggested = new Date().getHours() < 14 ? 'checkin' : 'checkout';
+  const other = suggested === 'checkin' ? 'checkout' : 'checkin';
+
   return (
     <section className="section">
-      <div className="chat-header">
-        <h2 className="section-title">Check-in</h2>
-        <div className="chat-actions">
-          <button type="button" className="refresh-btn" disabled={busy}
-            onClick={() => send('/daily-checkin', { fresh: true, label: 'Start check-in' })}>
-            Check in
-          </button>
-          <button type="button" className="refresh-btn" disabled={busy}
-            onClick={() => send('/daily-checkout', { fresh: true, label: 'Start check-out' })}>
-            Check out
-          </button>
-        </div>
-      </div>
+      <h2 className="section-title">Check-in</h2>
       <div className="card chat-card">
+        {started && (
+          <div className="chat-topbar">
+            <span className="chat-topbar-title">{ROUTINES[mode]?.title || 'Conversation'}</span>
+            <button type="button" className="chat-ghost-btn" onClick={startOver} disabled={busy}>
+              Start over
+            </button>
+          </div>
+        )}
         <div className="chat-messages" ref={listRef} aria-live="polite">
-          {messages.length === 0 && !busy && (
-            <p className="empty-state small">
-              Start your morning check-in or end-of-day check-out.
-            </p>
+          {!started && (
+            <div className="chat-start">
+              <p className="chat-start-text">
+                {suggested === 'checkin'
+                  ? 'Good morning. Ready to plan your day?'
+                  : 'Wrapping up? Close the day with a short check-out.'}
+              </p>
+              <div className="chat-start-actions">
+                <button type="button" className="chat-primary-btn" onClick={() => start(suggested)}>
+                  {ROUTINES[suggested].button}
+                </button>
+                <button type="button" className="chat-secondary-btn" onClick={() => start(other)}>
+                  {ROUTINES[other].button}
+                </button>
+              </div>
+            </div>
           )}
           {messages.map((m, i) => (
             <div key={i} className={`chat-msg chat-msg-${m.role}`}>
@@ -107,7 +137,7 @@ export default function CheckinChat({ date, onTurnDone }) {
           <textarea
             className="chat-input"
             rows={2}
-            placeholder={sessionId ? 'Reply… (Enter to send, Shift+Enter for a new line)' : 'Press Check in or Check out to start'}
+            placeholder={sessionId ? 'Reply… (Enter to send, Shift+Enter for a new line)' : 'Start a check-in or check-out above'}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
