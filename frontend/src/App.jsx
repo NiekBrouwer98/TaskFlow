@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, NavLink } from 'react-router-dom';
 import Today from './views/Today';
 import TaskOverview from './views/TaskOverview';
-import Planning from './views/Planning';
 import Schedule from './views/Schedule';
 import './App.css';
 
@@ -39,14 +38,11 @@ function App() {
               <NavLink to="/" className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')} end>
                 Today
               </NavLink>
-              <NavLink to="/overview" className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}>
-                Overview
+              <NavLink to="/tasks" className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}>
+                Tasks
               </NavLink>
               <NavLink to="/planning" className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}>
                 Planning
-              </NavLink>
-              <NavLink to="/schedule" className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}>
-                Schedule
               </NavLink>
             </nav>
             {config && (
@@ -61,9 +57,8 @@ function App() {
         <main className="main">
           <Routes>
             <Route path="/" element={<Today />} />
-            <Route path="/overview" element={<TaskOverview />} />
-            <Route path="/planning" element={<Planning />} />
-            <Route path="/schedule" element={<Schedule />} />
+            <Route path="/tasks" element={<TaskOverview />} />
+            <Route path="/planning" element={<Schedule />} />
           </Routes>
         </main>
       </div>

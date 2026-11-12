@@ -21,6 +21,9 @@ function timeSlots() {
 
 const SLOTS = timeSlots();
 
+// Rows grow to fill the window but never get shorter than --schedule-slot-height.
+const gridRows = `var(--schedule-header-row-height) repeat(${SLOTS.length}, minmax(var(--schedule-slot-height), 1fr))`;
+
 // Extended time options for meeting start/end pickers (07:00–20:00)
 function allTimeOptions() {
   const opts = [];
@@ -120,6 +123,8 @@ function buildBlocksForDay(dateYmd, schedules, meetingInstances) {
     blocks.push({
       startRow,
       endRow: Math.max(endRow, startRow + 1),
+      startTime: b.startTime,
+      endTime: b.endTime,
       title: b.title,
       type: 'meeting',
       meetingId: b.id,
@@ -133,6 +138,8 @@ function buildBlocksForDay(dateYmd, schedules, meetingInstances) {
     blocks.push({
       startRow,
       endRow: Math.max(endRow, startRow + 1),
+      startTime: s.startTime || '09:00',
+      endTime: s.endTime || '09:30',
       title: s.text || 'Task',
       type: 'scheduled',
       taskKey: s.taskKey,
@@ -161,6 +168,20 @@ function assignOverlapColumns(blocks) {
     });
     return { ...block, colIdx: colIdxArr[i], totalCols: maxCol + 1 };
   });
+}
+
+function formatRange(view, start, end) {
+  const fmt = (ymd, opts) => new Date(ymd + 'T12:00:00').toLocaleDateString('en-GB', opts);
+  if (view === 'day') return fmt(start, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const sameMonth = start.slice(0, 7) === end.slice(0, 7);
+  return `${fmt(start, sameMonth ? { day: 'numeric' } : { day: 'numeric', month: 'short' })} – ${fmt(end, { day: 'numeric', month: 'long', year: 'numeric' })}`;
+}
+
+// Position of the current time within the visible hours, as a % of the day column; null if outside.
+function nowOffsetPct(now) {
+  const minutes = (now.getHours() - HOUR_START) * 60 + now.getMinutes();
+  const total = (HOUR_END - HOUR_START) * 60;
+  return minutes < 0 || minutes > total ? null : (minutes / total) * 100;
 }
 
 function addMinutesToTime(timeStr, minutes) {
@@ -353,6 +374,12 @@ export default function Schedule() {
   const [showMeetingModal, setShowMeetingModal] = useState(false);
   const [manualTasks, setManualTasks] = useState([]);
   const [manualInput, setManualInput] = useState('');
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const start = view === 'week' ? weekStart(currentDate) : currentDate;
   const end = view === 'week' ? (() => {
@@ -501,7 +528,7 @@ export default function Schedule() {
   if (loading) {
     return (
       <div className="page">
-        <h1 className="page-title">Schedule</h1>
+        <h1 className="page-title">Planning</h1>
         <p className="empty-state">Loading…</p>
       </div>
     );
@@ -510,27 +537,27 @@ export default function Schedule() {
   return (
     <div className="page schedule-page">
       <div className="page-header">
-        <h1 className="page-title">Schedule</h1>
+        <h1 className="page-title">Planning</h1>
         <div className="schedule-actions">
-          <button className="refresh-btn" onClick={handleRefresh}>Refresh</button>
           <button className="meeting-blocks-btn" onClick={() => setShowMeetingModal(true)}>
-            Meeting Blocks {meetingBlocks.length > 0 && <span className="meeting-blocks-count">{meetingBlocks.length}</span>}
+            Meeting blocks {meetingBlocks.length > 0 && <span className="meeting-blocks-count">{meetingBlocks.length}</span>}
           </button>
-          <button onClick={goPrev} className="nav-btn">&#8592;</button>
-          <button onClick={goToday} className="nav-btn">Today</button>
-          <button onClick={goNext} className="nav-btn">&#8594;</button>
-          <span className="schedule-range">
-            {view === 'day' ? currentDate : `${start} \u2013 ${end}`}
-          </span>
-          <div className="tabs" style={{ marginBottom: 0 }}>
-            <button className={view === 'day' ? 'tab active' : 'tab'} onClick={() => setView('day')}>Day</button>
-            <button className={view === 'week' ? 'tab active' : 'tab'} onClick={() => setView('week')}>Week</button>
-          </div>
+          <button className="refresh-btn" onClick={handleRefresh}>Refresh</button>
         </div>
       </div>
-      <p className="page-subtitle">
-        Drag open tasks onto a time slot to schedule them. Use <strong>Meeting Blocks</strong> to mark recurring meetings so you can plan around them.
-      </p>
+
+      <div className="schedule-toolbar">
+        <div className="schedule-nav-group">
+          <button onClick={goPrev} className="nav-btn" aria-label={view === 'week' ? 'Previous week' : 'Previous day'}>&#8249;</button>
+          <button onClick={goToday} className="nav-btn">Today</button>
+          <button onClick={goNext} className="nav-btn" aria-label={view === 'week' ? 'Next week' : 'Next day'}>&#8250;</button>
+        </div>
+        <span className="schedule-range">{formatRange(view, start, end)}</span>
+        <div className="schedule-segmented" role="group" aria-label="View">
+          <button className={view === 'day' ? 'active' : ''} onClick={() => setView('day')} aria-pressed={view === 'day'}>Day</button>
+          <button className={view === 'week' ? 'active' : ''} onClick={() => setView('week')} aria-pressed={view === 'week'}>Week</button>
+        </div>
+      </div>
 
       {showMeetingModal && (
         <MeetingBlocksModal
@@ -570,7 +597,7 @@ export default function Schedule() {
       <div className="schedule-layout">
         <aside className="schedule-sidebar">
           <h3 className="schedule-sidebar-title">Tasks</h3>
-          <p className="schedule-sidebar-hint">Drag tasks to a time slot</p>
+          <p className="schedule-sidebar-hint">Drag a task onto the calendar to plan it.</p>
 
           <div className="manual-task-form">
             <input
@@ -655,31 +682,39 @@ export default function Schedule() {
           )}
         </aside>
 
-        <div className="schedule-grid-wrap">
+        <div className={`schedule-grid-wrap ${view}`}>
+          <div
+            className="schedule-canvas"
+            style={{ minHeight: `calc(var(--schedule-header-row-height) + ${SLOTS.length} * var(--schedule-slot-height))` }}
+          >
           <div
             className="schedule-grid"
             style={{
-              gridTemplateRows: `var(--schedule-header-row-height, 44px) repeat(${SLOTS.length}, minmax(0, 1fr))`,
+              gridTemplateRows: gridRows,
               gridTemplateColumns: `56px repeat(${dates.length}, minmax(0, 1fr))`,
             }}
           >
             <div className="schedule-corner" style={{ gridRow: 1, gridColumn: 1 }} />
-            {dates.map((d, colIndex) => (
-              <div
-                key={d}
-                className={`schedule-day-header ${d === todayYmd ? 'today' : ''}`}
-                style={{ gridRow: 1, gridColumn: colIndex + 2 }}
-              >
-                {new Date(d + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-              </div>
-            ))}
+            {dates.map((d, colIndex) => {
+              const day = new Date(d + 'T12:00:00');
+              return (
+                <div
+                  key={d}
+                  className={`schedule-day-header ${d === todayYmd ? 'today' : ''}`}
+                  style={{ gridRow: 1, gridColumn: colIndex + 2 }}
+                >
+                  <span className="schedule-day-name">{day.toLocaleDateString('en-GB', { weekday: 'short' })}</span>
+                  <span className="schedule-day-number">{day.getDate()}</span>
+                </div>
+              );
+            })}
             {SLOTS.map((timeStr, rowIndex) => (
               <React.Fragment key={rowIndex}>
                 <div
                   className="schedule-time-label"
                   style={{ gridRow: rowIndex + 2, gridColumn: 1 }}
                 >
-                  {timeStr}
+                  {timeStr.endsWith(':00') ? timeStr : ''}
                 </div>
                 {dates.map((dateYmd, colIndex) => {
                   const startTime = rowToTime(rowIndex);
@@ -687,7 +722,7 @@ export default function Schedule() {
                   return (
                     <div
                       key={`${dateYmd}-${rowIndex}`}
-                      className={`schedule-cell slot ${dateYmd === todayYmd ? 'today' : ''}`}
+                      className={`schedule-cell slot ${timeStr.endsWith(':00') ? 'hour-start' : ''} ${dateYmd === todayYmd ? 'today' : ''}`}
                       style={cellStyle}
                       data-date={dateYmd}
                       data-time={startTime}
@@ -702,10 +737,18 @@ export default function Schedule() {
           <div
             className="schedule-blocks-overlay"
             style={{
-              gridTemplateRows: `var(--schedule-header-row-height, 44px) repeat(${SLOTS.length}, minmax(0, 1fr))`,
+              gridTemplateRows: gridRows,
               gridTemplateColumns: `56px repeat(${dates.length}, minmax(0, 1fr))`,
             }}
           >
+            {dates.includes(todayYmd) && nowOffsetPct(now) !== null && (
+              <div
+                className="schedule-now"
+                style={{ gridRow: `2 / span ${SLOTS.length}`, gridColumn: dates.indexOf(todayYmd) + 2 }}
+              >
+                <div className="schedule-now-line" style={{ top: `${nowOffsetPct(now)}%` }} />
+              </div>
+            )}
             {dates.map((dateYmd, colIndex) => {
               const instances = expandMeetingBlocksForDate(meetingBlocks, dateYmd);
               const blocks = buildBlocksForDay(dateYmd, schedules, instances);
@@ -717,7 +760,8 @@ export default function Schedule() {
                 return (
                   <div
                     key={`${dateYmd}-${block.startRow}-${i}-${block.taskKey || block.meetingId || ''}`}
-                    className={`schedule-block ${block.type} ${isFinished ? 'task-finished' : ''}`}
+                    className={`schedule-block ${block.type} ${isFinished ? 'task-finished' : ''} ${block.endRow - block.startRow === 1 ? 'short' : ''}`}
+                    title={`${block.startTime}–${block.endTime}  ${block.title}`}
                     style={{
                       gridRow: `${block.startRow + 2} / span ${block.endRow - block.startRow}`,
                       gridColumn: colIndex + 2,
@@ -726,7 +770,12 @@ export default function Schedule() {
                       justifySelf: 'start',
                     }}
                   >
-                    <span className="schedule-block-title">{block.title}</span>
+                    <div className="schedule-block-body">
+                      <span className="schedule-block-title">{block.title}</span>
+                      {block.endRow - block.startRow > 1 && (
+                        <span className="schedule-block-time">{block.startTime} – {block.endTime}</span>
+                      )}
+                    </div>
                     {block.type === 'scheduled' && block.taskKey && (
                       <button
                         type="button"
@@ -742,6 +791,7 @@ export default function Schedule() {
                 );
               });
             })}
+          </div>
           </div>
         </div>
       </div>

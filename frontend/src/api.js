@@ -18,12 +18,6 @@ export async function getOverview() {
   return r.json();
 }
 
-export async function getPlanning(view = 'week') {
-  const r = await fetch(`${API}/planning?view=${encodeURIComponent(view)}`);
-  if (!r.ok) throw new Error('Failed to load planning');
-  return r.json();
-}
-
 export async function getToday() {
   const r = await fetch(`${API}/today`);
   if (!r.ok) throw new Error('Failed to load today');

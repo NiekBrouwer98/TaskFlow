@@ -94,69 +94,6 @@ app.get('/api/tasks/overview', async (_, res) => {
   });
 });
 
-app.get('/api/planning', async (req, res) => {
-  const view = (req.query.view || 'week').toLowerCase();
-  const data = await getDataAsync();
-  const withDate = data.allTasks.filter((t) => t.due || t.start);
-  const now = new Date();
-  const today = now.toISOString().slice(0, 10);
-
-  function parseYMD(str) {
-    if (!str) return null;
-    const [y, m, d] = str.split('-').map(Number);
-    return new Date(y, m - 1, d);
-  }
-
-  function inRange(dateStr, start, end) {
-    const d = parseYMD(dateStr);
-    if (!d) return false;
-    return d >= start && d <= end;
-  }
-
-  let start, end, label;
-  if (view === 'year') {
-    start = new Date(now.getFullYear(), 0, 1);
-    end = new Date(now.getFullYear(), 11, 31);
-    label = `${now.getFullYear()}`;
-  } else if (view === 'month') {
-    start = new Date(now.getFullYear(), now.getMonth(), 1);
-    end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    label = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  } else {
-    const day = now.getDay();
-    const mon = day === 0 ? -6 : 1 - day;
-    start = new Date(now);
-    start.setDate(now.getDate() + mon);
-    start.setHours(0, 0, 0, 0);
-    end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    end.setHours(23, 59, 59, 999);
-    label = `Week of ${start.toISOString().slice(0, 10)}`;
-  }
-
-  const planned = withDate.filter((t) => {
-    const d = t.due || t.start;
-    return inRange(d, start, end);
-  });
-
-  const byDate = {};
-  planned.forEach((t) => {
-    const d = t.due || t.start;
-    if (!byDate[d]) byDate[d] = [];
-    byDate[d].push(t);
-  });
-
-  res.json({
-    view,
-    label,
-    start: start.toISOString().slice(0, 10),
-    end: end.toISOString().slice(0, 10),
-    planned,
-    byDate,
-    today,
-  });
-});
-
 app.get('/api/today', async (_, res) => {
   const data = await getDataAsync();
   const today = getTodayLocal();
