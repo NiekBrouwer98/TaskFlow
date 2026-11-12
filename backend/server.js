@@ -4,16 +4,21 @@ import { config } from './config.js';
 import { loadAllTasks, getOpenTasks, getTasksByPriority, getTasksByTopic, getTodaySummary } from './vaultParser.js';
 import { fetchIcsEvents, fetchIcsEventsForRange, getOutlookComEvents, getEventsFromIcsFile, getEventsFromIcsFileForRange } from './calendarService.js';
 import { getGoogleCalendarEvents, isGoogleCalendarConfigured } from './googleCalendarService.js';
-import { getTaskKey, getSchedulesInRange, addOrUpdateSchedule, removeSchedule } from './scheduleStore.js';
+import { getTaskKey, getSchedulesInRange, addOrUpdateSchedule, removeSchedule, markScheduleDone } from './scheduleStore.js';
 import { getMeetingBlocks, addMeetingBlock, updateMeetingBlock, removeMeetingBlock } from './meetingBlocksStore.js';
 import { getTodosForDate, addTodo, updateTodo, deleteTodo } from './quickTodosStore.js';
+import { runChatTurn } from './chatService.js';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync, existsSync } from 'fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
-app.use(cors());
+const ALLOWED_ORIGINS = [
+  'http://localhost:3112', 'http://127.0.0.1:3112',
+  'http://localhost:3111', 'http://127.0.0.1:3111',
+];
+app.use(cors({ origin: ALLOWED_ORIGINS }));
 app.use(express.json());
 
 let cachedData = null;
@@ -280,6 +285,16 @@ app.delete('/api/schedule', (req, res) => {
   res.json({ ok: true });
 });
 
+app.patch('/api/schedule', (req, res) => {
+  const { taskKey, date, done } = req.body || {};
+  if (!taskKey || !date) {
+    return res.status(400).json({ error: 'taskKey and date required' });
+  }
+  const entry = markScheduleDone(taskKey, date, done);
+  if (!entry) return res.status(404).json({ error: 'Schedule entry not found' });
+  res.json(entry);
+});
+
 // Quick to-dos: ephemeral daily checklist stored in backend/quick-todos.json
 app.get('/api/quick-todos', (req, res) => {
   const date = req.query.date || getTodayLocal();
@@ -311,6 +326,18 @@ app.delete('/api/quick-todos/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// Chat with Claude Code (daily check-in / check-out skills), streamed as NDJSON.
+// Browsers always send Origin on cross-site POSTs, so this blocks other websites.
+app.post('/api/chat', (req, res) => {
+  const origin = req.get('origin');
+  if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+    return res.status(403).json({ error: 'Forbidden origin' });
+  }
+  const { message, sessionId } = req.body || {};
+  if (!message?.trim()) return res.status(400).json({ error: 'message required' });
+  runChatTurn({ message, sessionId }, res);
+});
+
 // Daily brief — written by the daily-brief skill via Obsidian MCP
 app.get('/api/daily-brief', (_, res) => {
   const briefPath = join(config.vaultPath, 'PROJECTS', 'Housekeeping', 'daily-brief.json');
@@ -324,7 +351,7 @@ app.get('/api/daily-brief', (_, res) => {
 });
 
 const PORT = config.port;
-app.listen(PORT, () => {
+app.listen(PORT, '127.0.0.1', () => {
   console.log(`Task app backend running at http://localhost:${PORT}`);
   console.log(`Vault path: ${config.vaultPath}`);
   if (config.calendar?.outlookUseCom) {

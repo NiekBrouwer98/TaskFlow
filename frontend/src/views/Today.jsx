@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getToday, refresh, getDailyBrief } from '../api';
+import { getToday, refresh, getDailyBrief, patchSchedule } from '../api';
+import CheckinChat from './CheckinChat';
 import '../App.css';
 
 function TaskItem({ task }) {
@@ -33,27 +34,44 @@ export default function Today() {
   const [brief, setBrief] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [slots, setSlots] = useState([]);
 
   const dateStr = getTodayDateStr();
 
   const load = async () => {
     setLoading(true);
+    await reloadData();
+    setLoading(false);
+  };
+
+  // No loading flag, so the chat panel stays mounted while data refreshes.
+  const reloadData = async () => {
     const [todayResult, briefResult] = await Promise.allSettled([
       getToday(),
       getDailyBrief(),
     ]);
     if (todayResult.status === 'fulfilled') setData(todayResult.value);
     if (briefResult.status === 'fulfilled') setBrief(briefResult.value);
-    setLoading(false);
+  };
+
+  const reloadAfterChat = async () => {
+    try { await refresh(); } catch (_) {}
+    await reloadData();
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    setSlots((data?.scheduledSlots ?? []).sort((a, b) =>
+      (a.startTime || '').localeCompare(b.startTime || '')
+    ));
+  }, [data]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
       await refresh();
-      await load();
+      await reloadData();
     } finally {
       setRefreshing(false);
     }
@@ -69,11 +87,21 @@ export default function Today() {
   }
 
   const tasks = (data?.allRelevant ?? []).map(t => ({ ...t, _today: dateStr }));
-  const scheduledSlots = data?.scheduledSlots ?? [];
   const googleEvents = data?.googleEvents ?? [];
-  const sortedSlots = [...scheduledSlots].sort((a, b) =>
-    (a.startTime || '').localeCompare(b.startTime || '')
-  );
+
+  const toggleSlotDone = async (slot) => {
+    const newDone = !slot.done;
+    setSlots(prev => prev.map(s =>
+      s.taskKey === slot.taskKey && s.date === slot.date ? { ...s, done: newDone } : s
+    ));
+    try {
+      await patchSchedule(slot.taskKey, slot.date, { done: newDone });
+    } catch {
+      setSlots(prev => prev.map(s =>
+        s.taskKey === slot.taskKey && s.date === slot.date ? { ...s, done: slot.done } : s
+      ));
+    }
+  };
 
   // Only show brief if it was generated today
   const briefIsToday = brief?.date === dateStr;
@@ -84,7 +112,7 @@ export default function Today() {
   }
 
   return (
-    <div className="page">
+    <div className="page today-page">
       <div className="page-header">
         <h1 className="page-title">Today</h1>
         <button className="refresh-btn" onClick={handleRefresh} disabled={refreshing}>
@@ -95,26 +123,9 @@ export default function Today() {
         Your day at a glance.
       </p>
 
-      {googleEvents.length > 0 && (
-        <section className="section">
-          <h2 className="section-title">Google Calendar</h2>
-          <div className="card">
-            <div className="card-body">
-              <ul className="today-scheduled-list">
-                {googleEvents.map((event, i) => (
-                  <li key={i} className="today-scheduled-item">
-                    <span className="today-scheduled-time">
-                      {event.allDay ? 'All day' : `${formatEventTime(event.start)} – ${formatEventTime(event.end)}`}
-                    </span>
-                    <span className="today-scheduled-text">{event.title}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </section>
-      )}
+      <CheckinChat date={dateStr} onTurnDone={reloadAfterChat} />
 
+      <div className="today-two-col">
       <section className="section">
         <h2 className="section-title">Daily brief</h2>
         <div className="card">
@@ -185,17 +196,23 @@ export default function Today() {
         <h2 className="section-title">Tasks for today</h2>
         <div className="card">
           <div className="card-body">
-            {sortedSlots.length > 0 && (
+            {slots.length > 0 && (
               <ul className="today-scheduled-list">
-                {sortedSlots.map((slot, i) => (
-                  <li key={`${slot.taskKey}-${slot.date}-${i}`} className="today-scheduled-item">
+                {slots.map((slot, i) => (
+                  <li key={`${slot.taskKey}-${slot.date}-${i}`} className={`today-scheduled-item${slot.done ? ' task-finished' : ''}`}>
+                    <button
+                      type="button"
+                      className={`today-slot-check${slot.done ? ' checked' : ''}`}
+                      onClick={() => toggleSlotDone(slot)}
+                      aria-label={slot.done ? 'Mark undone' : 'Mark done'}
+                    />
                     <div className="today-scheduled-main">
-                      <span className="today-scheduled-time">
-                        {slot.startTime} – {slot.endTime}
-                      </span>
+                      <div style={{display:'flex', alignItems:'baseline', gap:'8px'}}>
+                        <span className="today-scheduled-time">{slot.startTime} – {slot.endTime}</span>
+                        {slot.project && <span className="today-scheduled-project">{slot.project}</span>}
+                      </div>
                       <span className="today-scheduled-text">{slot.text || 'Task'}</span>
                     </div>
-                    {slot.project && <span className="today-scheduled-project">{slot.project}</span>}
                   </li>
                 ))}
               </ul>
@@ -209,12 +226,33 @@ export default function Today() {
                 ))}
               </ul>
             )}
-            {sortedSlots.length === 0 && (briefIsToday || tasks.length === 0) && (
+            {slots.length === 0 && (briefIsToday || tasks.length === 0) && (
               <p className="empty-state">No time slots scheduled for today.</p>
             )}
           </div>
         </div>
       </section>
+      </div>
+
+      {googleEvents.length > 0 && (
+        <section className="section">
+          <h2 className="section-title">Google Calendar</h2>
+          <div className="card">
+            <div className="card-body">
+              <ul className="today-scheduled-list">
+                {googleEvents.map((event, i) => (
+                  <li key={i} className="today-scheduled-item">
+                    <span className="today-scheduled-time">
+                      {event.allDay ? 'All day' : `${formatEventTime(event.start)} – ${formatEventTime(event.end)}`}
+                    </span>
+                    <span className="today-scheduled-text">{event.title}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

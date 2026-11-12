@@ -44,6 +44,7 @@ export function addOrUpdateSchedule({ taskKey, date, startTime, endTime, project
     endTime: end || '09:30',
     project: project || null,
     text: text || null,
+    done: existing >= 0 ? (schedules[existing].done || false) : false,
   };
   if (existing >= 0) {
     schedules[existing] = entry;
@@ -52,6 +53,15 @@ export function addOrUpdateSchedule({ taskKey, date, startTime, endTime, project
   }
   saveSchedules(schedules);
   return entry;
+}
+
+export function markScheduleDone(taskKey, date, done) {
+  const schedules = loadSchedules();
+  const idx = schedules.findIndex((s) => s.taskKey === taskKey && s.date === date);
+  if (idx < 0) return null;
+  schedules[idx] = { ...schedules[idx], done: !!done };
+  saveSchedules(schedules);
+  return schedules[idx];
 }
 
 export function removeSchedule(taskKey, date) {

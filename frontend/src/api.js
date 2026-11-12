@@ -59,6 +59,16 @@ export async function postSchedule({ taskKey, date, startTime, endTime, project,
   return r.json();
 }
 
+export async function patchSchedule(taskKey, date, updates) {
+  const r = await fetch(`${API}/schedule`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ taskKey, date, ...updates }),
+  });
+  if (!r.ok) throw new Error('Failed to update schedule');
+  return r.json();
+}
+
 export async function deleteSchedule(taskKey, date) {
   const r = await fetch(`${API}/schedule`, {
     method: 'DELETE',
@@ -73,6 +83,31 @@ export async function getDailyBrief() {
   const r = await fetch(`${API}/daily-brief`);
   if (!r.ok) return null;
   return r.json();
+}
+
+// Streams one chat turn; calls onEvent for each {type: session|text|tool|error|done}
+export async function streamChat(message, sessionId, onEvent) {
+  const r = await fetch(`${API}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, sessionId }),
+  });
+  if (!r.ok) {
+    let msg = `HTTP ${r.status}`;
+    try { const j = await r.json(); if (j.error) msg = j.error; } catch (_) {}
+    throw new Error(msg);
+  }
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    for (const line of lines) if (line.trim()) onEvent(JSON.parse(line));
+  }
 }
 
 export async function getQuickTodos(date) {
